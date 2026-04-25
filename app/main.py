@@ -3,7 +3,13 @@ import time
 from pathlib import Path
 from contextlib import asynccontextmanager
 
-from fastapi import FastAPI, HTTPException, UploadFile, File
+from fastapi import FastAPI, HTTPException
+
+try:
+    from fastapi import UploadFile, File
+    UPLOAD_AVAILABLE = True
+except ImportError:
+    UPLOAD_AVAILABLE = False
 from app.config import settings
 from app.engine.deepseek import chat
 from app.memory.conversation import get_history, append_history, clear_history
@@ -128,22 +134,28 @@ async def clear_chat(user_id: str):
 
 # ── 知识库管理 ──
 
-@app.post("/knowledge/upload")
-async def upload_documents(files: list[UploadFile] = File(...)):
-    """上传产品文档（PDF/DOCX/MD/TXT）"""
-    saved = []
-    for file in files:
-        ext = file.filename.split(".")[-1].lower()
-        if ext not in ["pdf", "docx", "md", "txt"]:
-            continue
-        file_path = UPLOAD_DIR / file.filename
-        file_path.write_bytes(await file.read())
-        saved.append(file.filename)
-    # 上传后自动刷新知识库
-    from app.engine.deepseek import reload_knowledge
-    reload_knowledge()
+if UPLOAD_AVAILABLE:
 
-    return {"uploaded": saved, "count": len(saved)}
+    @app.post("/knowledge/upload")
+    async def upload_documents(files: list[UploadFile] = File(...)):
+        """上传产品文档（PDF/DOCX/MD/TXT）"""
+        saved = []
+        for file in files:
+            ext = file.filename.split(".")[-1].lower()
+            if ext not in ["pdf", "docx", "md", "txt"]:
+                continue
+            file_path = UPLOAD_DIR / file.filename
+            file_path.write_bytes(await file.read())
+            saved.append(file.filename)
+        from app.engine.deepseek import reload_knowledge
+        reload_knowledge()
+        return {"uploaded": saved, "count": len(saved)}
+
+else:
+
+    @app.post("/knowledge/upload")
+    async def upload_documents_alt():
+        raise HTTPException(status_code=501, detail="File upload not available")
 
 
 @app.post("/knowledge/index")
