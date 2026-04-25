@@ -1,0 +1,10 @@
+.env
+.env.example
+data/
+uploads/
+__pycache__/
+*.pyc
+.venv/
+venv/
+*.egg-info/
+dist/
